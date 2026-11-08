@@ -9,8 +9,13 @@ package com.university.lab.assignment2;
  * @author natas
  */
 
+
 import com.university.lab.assignment2.discount.DiscountCalculator;
 import com.university.lab.assignment2.tax.TaxCalculator;
+import com.university.lab.assignment2.payment.PaymentStrategy;
+import com.university.lab.assignment2.payment.CreditCardPayment;
+import com.university.lab.assignment2.payment.EasyPaisaPayment;
+import com.university.lab.assignment2.payment.CashOnDeliveryPayment;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -96,64 +101,27 @@ public class OrderBillingEngine {
                 (String) orderData.getOrDefault(
                         "paymentMethod", "CASH");
 
-        String paymentStatus = "FAILED";
+        PaymentStrategy paymentStrategy;
+        String paymentDetail = "";
 
         if (paymentMethod.equals("CREDIT_CARD")) {
 
-            String cardNumber =
+            paymentStrategy = new CreditCardPayment();
+
+            paymentDetail =
                     (String) orderData.getOrDefault("cardNumber", "");
-
-            if (cardNumber.length() == 16
-                    && cardNumber.matches("\\d+")) {
-
-                System.out.println(
-                        "Processing credit card payment of PKR "
-                        + payableAmount);
-
-                paymentStatus = "PAID";
-
-            } else {
-
-                System.out.println(
-                        "Card declined: Must be 16 digits.");
-
-                return false;
-            }
 
         } else if (paymentMethod.equals("EASYPAISA")) {
 
-            String mobileNo =
+            paymentStrategy = new EasyPaisaPayment();
+
+            paymentDetail =
                     (String) orderData.getOrDefault(
                             "mobileNumber", "");
 
-            if (mobileNo.length() == 11
-                    && mobileNo.startsWith("03")) {
-
-                System.out.println(
-                        "Sending EasyPaisa OTP push to "
-                        + mobileNo + " for PKR " + payableAmount);
-
-                paymentStatus = "PAID";
-
-            } else {
-
-                System.out.println(
-                        "EasyPaisa failed: Invalid mobile number.");
-
-                return false;
-            }
-
         } else if (paymentMethod.equals("CASH_ON_DELIVERY")) {
 
-            if (payableAmount > 25000) {
-
-                System.out.println(
-                        "Cash on delivery not allowed for orders above PKR 25,000.");
-
-                return false;
-            }
-
-            paymentStatus = "PENDING_CASH";
+            paymentStrategy = new CashOnDeliveryPayment();
 
         } else {
 
@@ -161,6 +129,14 @@ public class OrderBillingEngine {
                     "Error: Unsupported payment method: "
                     + paymentMethod);
 
+            return false;
+        }
+
+        String paymentStatus =
+                paymentStrategy.processPayment(
+                        payableAmount, paymentDetail);
+
+        if (paymentStatus == null) {
             return false;
         }
 
