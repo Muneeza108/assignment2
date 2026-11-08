@@ -20,9 +20,10 @@ import com.university.lab.assignment2.notification.NotificationService;
 import com.university.lab.assignment2.notification.EmailNotification;
 import com.university.lab.assignment2.notification.SMSNotification;
 
-import java.io.FileWriter;
+import com.university.lab.assignment2.repository.OrderRepository;
+import com.university.lab.assignment2.repository.FileOrderRepository;
+
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -143,14 +144,13 @@ public class OrderBillingEngine {
             return false;
         }
 
-        try (FileWriter writer =
-                new FileWriter(logFilePath, true)) {
+        OrderRepository orderRepository =
+                new FileOrderRepository(logFilePath);
 
-            writer.write(
-                    LocalDateTime.now()
-                    + " | Order for: " + email
-                    + " | Payable: PKR " + payableAmount
-                    + " | Status: " + paymentStatus + "\n");
+        try {
+
+            orderRepository.saveOrder(
+                    email, payableAmount, paymentStatus);
 
         } catch (IOException e) {
 
@@ -164,7 +164,7 @@ public class OrderBillingEngine {
 
         String phone = null;
 
-NotificationService notificationService = null;
+        NotificationService notificationService = null;
 
         if (notifyChannel.equals("EMAIL")) {
 
@@ -172,11 +172,11 @@ NotificationService notificationService = null;
 
         } else if (notifyChannel.equals("SMS")) {
 
-    phone = (String) orderData.getOrDefault(
-            "phone", "0300-0000000");
+            phone = (String) orderData.getOrDefault(
+                    "phone", "0300-0000000");
 
-    notificationService = new SMSNotification();
-}
+            notificationService = new SMSNotification();
+        }
 
         if (notificationService != null) {
 
