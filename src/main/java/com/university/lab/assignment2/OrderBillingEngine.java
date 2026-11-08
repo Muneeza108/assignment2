@@ -9,6 +9,9 @@ package com.university.lab.assignment2;
  * @author natas
  */
 
+import com.university.lab.assignment2.discount.DiscountCalculator;
+import com.university.lab.assignment2.tax.TaxCalculator;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -18,6 +21,12 @@ import java.util.Map;
 public class OrderBillingEngine {
 
     private String logFilePath = "order_audit.log";
+
+    private final DiscountCalculator discountCalculator =
+            new DiscountCalculator();
+
+    private final TaxCalculator taxCalculator =
+            new TaxCalculator();
 
     public boolean processOrder(Map<String, Object> orderData) {
 
@@ -51,7 +60,6 @@ public class OrderBillingEngine {
 
                 System.out.println(
                         "Error: Missing item price or quantity!");
-
                 return false;
             }
 
@@ -61,62 +69,26 @@ public class OrderBillingEngine {
             if (price <= 0 || quantity <= 0) {
                 System.out.println(
                         "Error: Invalid price or quantity for item!");
-
                 return false;
             }
 
             rawTotal += price * quantity;
         }
 
-        double discount = 0.0;
-
         String customerType =
                 (String) orderData.getOrDefault(
                         "customerType", "REGULAR");
 
-        if (customerType.equals("VIP")) {
-
-            if (rawTotal > 5000) {
-                discount = rawTotal * 0.15;
-            } else {
-                discount = rawTotal * 0.10;
-            }
-
-        } else if (customerType.equals("STUDENT")) {
-
-            discount = rawTotal * 0.08;
-
-        } else if (customerType.equals("CORPORATE")) {
-
-            if (items.size() >= 10) {
-                discount = rawTotal * 0.20;
-            } else {
-                discount = rawTotal * 0.05;
-            }
-
-        } else {
-
-            if (rawTotal > 10000) {
-                discount = 500.0;
-            }
-        }
+        double discount =
+                discountCalculator.calculateDiscount(
+                        rawTotal, customerType, items);
 
         double netAmount = rawTotal - discount;
 
         String country =
                 (String) orderData.getOrDefault("country", "PK");
 
-        double taxRate = 0.15;
-
-        if (country.equals("PK")) {
-            taxRate = 0.17;
-        } else if (country.equals("US")) {
-            taxRate = 0.08;
-        } else if (country.equals("UK")) {
-            taxRate = 0.20;
-        }
-
-        double tax = netAmount * taxRate;
+        double tax = taxCalculator.calculateTax(netAmount, country);
 
         double payableAmount = netAmount + tax;
 
@@ -129,15 +101,14 @@ public class OrderBillingEngine {
         if (paymentMethod.equals("CREDIT_CARD")) {
 
             String cardNumber =
-                    (String) orderData.getOrDefault(
-                            "cardNumber", "");
+                    (String) orderData.getOrDefault("cardNumber", "");
 
             if (cardNumber.length() == 16
                     && cardNumber.matches("\\d+")) {
 
                 System.out.println(
                         "Processing credit card payment of PKR "
-                                + payableAmount);
+                        + payableAmount);
 
                 paymentStatus = "PAID";
 
@@ -160,8 +131,7 @@ public class OrderBillingEngine {
 
                 System.out.println(
                         "Sending EasyPaisa OTP push to "
-                                + mobileNo + " for PKR "
-                                + payableAmount);
+                        + mobileNo + " for PKR " + payableAmount);
 
                 paymentStatus = "PAID";
 
@@ -178,8 +148,7 @@ public class OrderBillingEngine {
             if (payableAmount > 25000) {
 
                 System.out.println(
-                        "Cash on delivery not allowed for orders "
-                                + "above PKR 25,000.");
+                        "Cash on delivery not allowed for orders above PKR 25,000.");
 
                 return false;
             }
@@ -190,20 +159,19 @@ public class OrderBillingEngine {
 
             System.out.println(
                     "Error: Unsupported payment method: "
-                            + paymentMethod);
+                    + paymentMethod);
 
             return false;
         }
 
         try (FileWriter writer =
-                     new FileWriter(logFilePath, true)) {
+                new FileWriter(logFilePath, true)) {
 
             writer.write(
                     LocalDateTime.now()
-                            + " | Order for: " + email
-                            + " | Payable: PKR " + payableAmount
-                            + " | Status: " + paymentStatus
-                            + "\n");
+                    + " | Order for: " + email
+                    + " | Payable: PKR " + payableAmount
+                    + " | Status: " + paymentStatus + "\n");
 
         } catch (IOException e) {
 
@@ -219,9 +187,9 @@ public class OrderBillingEngine {
 
             System.out.println(
                     "[EMAIL DISPATCHED] To: " + email
-                            + " | Your order of PKR "
-                            + String.format("%.2f", payableAmount)
-                            + " is confirmed!");
+                    + " | Your order of PKR "
+                    + String.format("%.2f", payableAmount)
+                    + " is confirmed!");
 
         } else if (notifyChannel.equals("SMS")) {
 
@@ -231,8 +199,8 @@ public class OrderBillingEngine {
 
             System.out.println(
                     "[SMS DISPATCHED] To: " + phone
-                            + " | Order confirmed! Paid: PKR "
-                            + String.format("%.2f", payableAmount));
+                    + " | Order confirmed! Paid: PKR "
+                    + String.format("%.2f", payableAmount));
         }
 
         return true;
@@ -246,4 +214,3 @@ public class OrderBillingEngine {
         return logFilePath;
     }
 }
-
