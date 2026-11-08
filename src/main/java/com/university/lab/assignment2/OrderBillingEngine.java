@@ -8,6 +8,7 @@ package com.university.lab.assignment2;
  *
  * @author natas
  */
+
 import com.university.lab.assignment2.discount.DiscountCalculator;
 import com.university.lab.assignment2.tax.TaxCalculator;
 
@@ -23,7 +24,11 @@ import com.university.lab.assignment2.notification.SMSNotification;
 import com.university.lab.assignment2.repository.OrderRepository;
 import com.university.lab.assignment2.repository.FileOrderRepository;
 
+import com.university.lab.assignment2.model.Order;
+import com.university.lab.assignment2.model.OrderItem;
+
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -52,17 +57,18 @@ public class OrderBillingEngine {
         }
 
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> items =
+        List<Map<String, Object>> itemData =
                 (List<Map<String, Object>>) orderData.get("items");
 
-        if (items == null || items.isEmpty()) {
+        if (itemData == null || itemData.isEmpty()) {
             System.out.println("Error: Cart has no items!");
             return false;
         }
 
+        List<OrderItem> items = new ArrayList<>();
         double rawTotal = 0.0;
 
-        for (Map<String, Object> item : items) {
+        for (Map<String, Object> item : itemData) {
 
             if (!item.containsKey("price")
                     || !item.containsKey("quantity")) {
@@ -81,49 +87,80 @@ public class OrderBillingEngine {
                 return false;
             }
 
-            rawTotal += price * quantity;
+            OrderItem orderItem = new OrderItem(price, quantity);
+
+            items.add(orderItem);
+            rawTotal += orderItem.getSubtotal();
         }
 
         String customerType =
                 (String) orderData.getOrDefault(
                         "customerType", "REGULAR");
 
-        double discount =
-                discountCalculator.calculateDiscount(
-                        rawTotal, customerType, items);
-
-        double netAmount = rawTotal - discount;
-
         String country =
                 (String) orderData.getOrDefault("country", "PK");
-
-        double tax = taxCalculator.calculateTax(netAmount, country);
-
-        double payableAmount = netAmount + tax;
 
         String paymentMethod =
                 (String) orderData.getOrDefault(
                         "paymentMethod", "CASH");
 
+        String cardNumber =
+                (String) orderData.getOrDefault("cardNumber", "");
+
+        String mobileNumber =
+                (String) orderData.getOrDefault("mobileNumber", "");
+
+        String notifyChannel =
+                (String) orderData.getOrDefault(
+                        "notifyChannel", "EMAIL");
+
+        String phone = null;
+
+        if (notifyChannel.equals("SMS")) {
+            phone = (String) orderData.getOrDefault(
+                    "phone", "0300-0000000");
+        }
+
+        Order order = new Order(
+                email,
+                customerType,
+                country,
+                items,
+                paymentMethod,
+                cardNumber,
+                mobileNumber,
+                notifyChannel,
+                phone
+        );
+
+        double discount =
+                discountCalculator.calculateDiscount(
+                        rawTotal,
+                        order.getCustomerType(),
+                        order.getItems().size());
+
+        double netAmount = rawTotal - discount;
+
+        double tax =
+                taxCalculator.calculateTax(
+                        netAmount, order.getCountry());
+
+        double payableAmount = netAmount + tax;
+
         PaymentStrategy paymentStrategy;
         String paymentDetail = "";
 
-        if (paymentMethod.equals("CREDIT_CARD")) {
+        if (order.getPaymentMethod().equals("CREDIT_CARD")) {
 
             paymentStrategy = new CreditCardPayment();
+            paymentDetail = order.getCardNumber();
 
-            paymentDetail =
-                    (String) orderData.getOrDefault("cardNumber", "");
-
-        } else if (paymentMethod.equals("EASYPAISA")) {
+        } else if (order.getPaymentMethod().equals("EASYPAISA")) {
 
             paymentStrategy = new EasyPaisaPayment();
+            paymentDetail = order.getMobileNumber();
 
-            paymentDetail =
-                    (String) orderData.getOrDefault(
-                            "mobileNumber", "");
-
-        } else if (paymentMethod.equals("CASH_ON_DELIVERY")) {
+        } else if (order.getPaymentMethod().equals("CASH_ON_DELIVERY")) {
 
             paymentStrategy = new CashOnDeliveryPayment();
 
@@ -131,7 +168,7 @@ public class OrderBillingEngine {
 
             System.out.println(
                     "Error: Unsupported payment method: "
-                    + paymentMethod);
+                    + order.getPaymentMethod());
 
             return false;
         }
@@ -150,7 +187,9 @@ public class OrderBillingEngine {
         try {
 
             orderRepository.saveOrder(
-                    email, payableAmount, paymentStatus);
+                    order.getCustomerEmail(),
+                    payableAmount,
+                    paymentStatus);
 
         } catch (IOException e) {
 
@@ -158,22 +197,13 @@ public class OrderBillingEngine {
                     "Failed to write order log: " + e.getMessage());
         }
 
-        String notifyChannel =
-                (String) orderData.getOrDefault(
-                        "notifyChannel", "EMAIL");
-
-        String phone = null;
-
         NotificationService notificationService = null;
 
-        if (notifyChannel.equals("EMAIL")) {
+        if (order.getNotifyChannel().equals("EMAIL")) {
 
             notificationService = new EmailNotification();
 
-        } else if (notifyChannel.equals("SMS")) {
-
-            phone = (String) orderData.getOrDefault(
-                    "phone", "0300-0000000");
+        } else if (order.getNotifyChannel().equals("SMS")) {
 
             notificationService = new SMSNotification();
         }
@@ -181,7 +211,9 @@ public class OrderBillingEngine {
         if (notificationService != null) {
 
             notificationService.sendNotification(
-                    email, phone, payableAmount);
+                    order.getCustomerEmail(),
+                    order.getPhone(),
+                    payableAmount);
         }
 
         return true;

@@ -8,16 +8,12 @@ package com.university.lab.assignment2.discount;
  *
  * @author natas
  */
-
-import java.util.List;
-import java.util.Map;
-
 public class DiscountCalculator {
 
     public double calculateDiscount(
             double rawTotal,
             String customerType,
-            List<Map<String, Object>> items) {
+            int itemCount) {
 
         if (customerType == null) {
             customerType = "REGULAR";
@@ -39,7 +35,7 @@ public class DiscountCalculator {
 
         } else if (customerType.equals("CORPORATE")) {
 
-            if (items.size() >= 10) {
+            if (itemCount >= 10) {
                 discount = rawTotal * 0.20;
             } else {
                 discount = rawTotal * 0.05;
@@ -55,4 +51,3 @@ public class DiscountCalculator {
         return discount;
     }
 }
-
