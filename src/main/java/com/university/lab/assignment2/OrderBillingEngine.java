@@ -8,14 +8,17 @@ package com.university.lab.assignment2;
  *
  * @author natas
  */
-
-
 import com.university.lab.assignment2.discount.DiscountCalculator;
 import com.university.lab.assignment2.tax.TaxCalculator;
+
 import com.university.lab.assignment2.payment.PaymentStrategy;
 import com.university.lab.assignment2.payment.CreditCardPayment;
 import com.university.lab.assignment2.payment.EasyPaisaPayment;
 import com.university.lab.assignment2.payment.CashOnDeliveryPayment;
+
+import com.university.lab.assignment2.notification.NotificationService;
+import com.university.lab.assignment2.notification.EmailNotification;
+import com.university.lab.assignment2.notification.SMSNotification;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -159,24 +162,26 @@ public class OrderBillingEngine {
                 (String) orderData.getOrDefault(
                         "notifyChannel", "EMAIL");
 
+        String phone = null;
+
+NotificationService notificationService = null;
+
         if (notifyChannel.equals("EMAIL")) {
 
-            System.out.println(
-                    "[EMAIL DISPATCHED] To: " + email
-                    + " | Your order of PKR "
-                    + String.format("%.2f", payableAmount)
-                    + " is confirmed!");
+            notificationService = new EmailNotification();
 
         } else if (notifyChannel.equals("SMS")) {
 
-            String phone =
-                    (String) orderData.getOrDefault(
-                            "phone", "0300-0000000");
+    phone = (String) orderData.getOrDefault(
+            "phone", "0300-0000000");
 
-            System.out.println(
-                    "[SMS DISPATCHED] To: " + phone
-                    + " | Order confirmed! Paid: PKR "
-                    + String.format("%.2f", payableAmount));
+    notificationService = new SMSNotification();
+}
+
+        if (notificationService != null) {
+
+            notificationService.sendNotification(
+                    email, phone, payableAmount);
         }
 
         return true;
